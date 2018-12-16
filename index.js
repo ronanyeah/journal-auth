@@ -2,8 +2,8 @@ const { GraphQLClient } = require("graphql-request");
 const { promisify } = require("util");
 const { normalizeEmail, isEmail } = require("validator");
 const jwt = require("jsonwebtoken");
-const restify = require("restify");
-const corsMiddleware = require("restify-cors-middleware");
+const { GraphQLServer } = require("graphql-yoga");
+const { resolve } = require("path");
 
 const sign = promisify(jwt.sign);
 
@@ -55,69 +55,49 @@ const token = id =>
     JWT_SECRET
   );
 
-const server = restify.createServer();
+new GraphQLServer({
+  port: PORT,
+  typeDefs: resolve(__dirname, "./schema.graphql"),
+  resolvers: {
+    Query: {
+      nonce: async (_, { email }) => {
+        const {
+          user: [u]
+        } = await client.request(getNonce(normalizeEmail(email)));
 
-const cors = corsMiddleware({
-  preflightMaxAge: 5,
-  origins: ["*"],
-  allowHeaders: [],
-  exposeHeaders: []
-});
+        return u ? u.nonce : Error("invalid email or password");
+      }
+    },
+    Mutation: {
+      login: async (_, { email, password }) => {
+        const {
+          user: [u]
+        } = await client.request(query(normalizeEmail(email), password));
 
-server.pre(cors.preflight);
+        return u ? token(u.id) : Error("invalid email or password");
+      },
+      signup: async (_, { email, password, nonce }) => {
+        if (!isEmail(email)) {
+          return Error("not a valid email address");
+        }
+        const data = await client
+          .request(insert(normalizeEmail(email), password, nonce))
+          .catch(() => null);
 
-server.use(cors.actual);
+        if (!data) {
+          return Error("this user already exists");
+        }
 
-server.use(restify.plugins.bodyParser());
+        const {
+          insert_user: {
+            returning: [{ id }]
+          }
+        } = data;
 
-server.post("/auth/signup", async (request, response) => {
-  const { email, nonce, password } = request.body;
-  if (!isEmail(email)) {
-    return response.send(400, {
-      errors: ["not a valid email address"]
-    });
-  }
-  const data = await client
-    .request(insert(normalizeEmail(email), password, nonce))
-    .catch(() => null);
-
-  if (!data) {
-    return response.send(400, {
-      errors: ["this user already exists"]
-    });
-  }
-
-  const {
-    insert_user: {
-      returning: [{ id }]
+        return token(id);
+      }
     }
-  } = data;
-
-  return response.send({ id, token: await token(id) });
-});
-
-server.post("/auth/login", async (request, response) => {
-  const { email, password } = request.body;
-  const {
-    user: [u]
-  } = await client.request(query(normalizeEmail(email), password));
-  return u
-    ? response.send({ token: await token(u.id), id: u.id })
-    : response.send(404, {
-        errors: ["invalid email or password"]
-      });
-});
-
-server.post("/auth/nonce", async (request, response) => {
-  const { email } = request.body;
-  const {
-    user: [u]
-  } = await client.request(getNonce(normalizeEmail(email)));
-  return u
-    ? response.send({ nonce: u.nonce })
-    : response.send(404, {
-        errors: ["invalid email or password"]
-      });
-});
-
-server.listen(PORT, () => console.log(`server listening on port: ${PORT}`));
+  }
+}).start(({ port }) =>
+  console.log(`GraphQL server is running on port ${port}!`)
+);

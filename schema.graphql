@@ -1,0 +1,8 @@
+type Mutation {
+  login(email: String!, password: String!): String!
+  signup(email: String!, password: String!, nonce: String!): String!
+}
+
+type Query {
+  nonce(email: String!): String!
+}
