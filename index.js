@@ -7,13 +7,21 @@ const { resolve } = require("path");
 
 const sign = promisify(jwt.sign);
 
-const { HASURA_URL, ACCESS_KEY, JWT_SECRET, PORT } = process.env;
+const {
+  HASURA_GRAPHQL_ENDPOINT,
+  HASURA_GRAPHQL_ACCESS_KEY,
+  JWT_SECRET,
+  PORT
+} = process.env;
 
-const client = new GraphQLClient(HASURA_URL, {
-  headers: {
-    "X-Hasura-Access-Key": ACCESS_KEY
+const client = new GraphQLClient(
+  HASURA_GRAPHQL_ENDPOINT + "/v1alpha1/graphql",
+  {
+    headers: {
+      "X-Hasura-Access-Key": HASURA_GRAPHQL_ACCESS_KEY
+    }
   }
-});
+);
 
 const query = (email, pw) => `\
 {
