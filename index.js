@@ -163,8 +163,7 @@ app.use(
     schema: makeExecutableSchema({
       typeDefs,
       resolvers
-    }),
-    graphiql: true
+    })
   })
 );
 
