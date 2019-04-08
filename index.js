@@ -105,7 +105,7 @@ const token = id =>
       sub: id.toString(),
       iat: Date.now() / 1000,
       "https://hasura.io/jwt/claims": {
-        "x-hasura-allowed-roles": ["editor", "user", "mod"],
+        "x-hasura-allowed-roles": ["user", "anon"],
         "x-hasura-default-role": "user",
         "x-hasura-user-id": id.toString()
       }
