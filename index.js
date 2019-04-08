@@ -8,61 +8,30 @@ const expressGraphql = require("express-graphql");
 const { makeExecutableSchema } = require("graphql-tools");
 const axios = require("axios");
 
-let accessToken = "updog";
-
 const sign = promisify(jwt.sign);
 
 const {
   HASURA_GRAPHQL_ENDPOINT,
   HASURA_GRAPHQL_ACCESS_KEY,
   JWT_SECRET,
-  PORT,
-  SPOTIFY_CLIENT_ID,
-  SPOTIFY_CLIENT_SECRET
+  PORT
 } = process.env;
 
 const typeDefs = readFileSync("./schema.graphql", "utf8");
 
-const authHeader =
-  "Basic " +
-  Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString(
-    "base64"
-  );
-
-const refreshToken = () =>
+const search = query =>
   axios
-    .post("https://accounts.spotify.com/api/token", null, {
-      headers: {
-        Authorization: authHeader
-      },
-      params: { grant_type: "client_credentials" }
-    })
-    .then(({ data }) => (accessToken = data.access_token));
-
-const search = (query, i = 0) =>
-  axios
-    .get(`https://api.spotify.com/v1/search?q=${query}&type=track`, {
-      headers: {
-        Authorization: "Bearer " + accessToken
-      }
-    })
-    .then(({ data }) =>
-      data.tracks.items.map(song => ({
-        name: song.name,
-        id: song.id,
-        imageUrl: song.album.images[2].url,
-        artistName: song.artists[0].name
-      }))
+    .get(
+      `http://ws.audioscrobbler.com/2.0/?method=track.search&track=${query}&api_key=${"9da38c677347e0ff817f60685ae4b447"}&format=json`
     )
-    .catch(async err => {
-      if (err.response.status === 401) {
-        await refreshToken();
-        return i >= 5 ? [] : search(query, i + 1);
-      } else {
-        console.log(err.response.status, err.response.statusText);
-        return [];
-      }
-    });
+    .then(({ data }) =>
+      data.results.trackmatches.track.map(song => ({
+        name: song.name,
+        id: "song.id",
+        imageUrl: song.image[0]["#text"],
+        artistName: song.artist
+      }))
+    );
 
 const client = new GraphQLClient(
   HASURA_GRAPHQL_ENDPOINT + "/v1alpha1/graphql",
